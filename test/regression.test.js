@@ -70,12 +70,16 @@ test('Atlas HTTP regression', { timeout: 240000 }, async function (t) {
             method, signal: AbortSignal.timeout(30000),
             ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: raw ? body : JSON.stringify(body) })
         });
+        if (expected !== undefined) assert.equal(response.status, expected, method + ' ' + path);
+        if (response.status === 204) {
+            assert.equal(await response.text(), '');
+            return { status: response.status };
+        }
         const result = await response.json();
         assert.match(response.headers.get('content-type'), /application\/json/);
         assert.deepEqual(Object.keys(result).sort(), ['data', 'message']);
         assert.equal(typeof result.message, 'string');
         assert.equal(JSON.stringify(result.data).includes('"__v":'), false);
-        if (expected !== undefined) assert.equal(response.status, expected, method + ' ' + path + ': ' + result.message);
         if (response.status >= 400) assert.equal(result.data, null);
         if (response.status === 500) assert.equal(result.message, 'Internal server error.');
         return { status: response.status, ...result };
@@ -290,17 +294,17 @@ test('Atlas HTTP regression', { timeout: 240000 }, async function (t) {
         assert.equal((await Task.findById(done._id)).assignedUser, '');
         const reopened = await step('PUT', 'tasks/' + pending._id, { ...taskBody, assignedUser: c._id }, 200);
         assert.equal(reopened.assignedUserName, 'Lifecycle final C');
-        await step('DELETE', 'users/' + c._id, undefined, 200);
+        await step('DELETE', 'users/' + c._id, undefined, 204);
         const before = await snapshot(scope);
         await step('PUT', 'tasks/' + pending._id, { ...taskBody, assignedUser: c._id }, 404);
         assert.deepEqual(await snapshot(scope), before);
-        await step('DELETE', 'tasks/' + pending._id, undefined, 200);
+        await step('DELETE', 'tasks/' + pending._id, undefined, 204);
         await step('GET', 'users/' + c._id, undefined, 404);
         await step('GET', 'tasks/' + pending._id, undefined, 404);
         const taskQuery = new URLSearchParams({ where: JSON.stringify({ _id: { $in: [pending._id, done._id, free._id] } }), count: 'true' });
         assert.equal(await step('GET', 'tasks?' + taskQuery, undefined, 200), 2);
-        for (const id of [done._id, free._id]) await step('DELETE', 'tasks/' + id, undefined, 200);
-        for (const id of [a._id, b._id]) await step('DELETE', 'users/' + id, undefined, 200);
+        for (const id of [done._id, free._id]) await step('DELETE', 'tasks/' + id, undefined, 204);
+        for (const id of [a._id, b._id]) await step('DELETE', 'users/' + id, undefined, 204);
         taskQuery.set('count', 'false');
         assert.deepEqual(await step('GET', 'tasks?' + taskQuery, undefined, 200), []);
         assert.deepEqual(await snapshot(sentinelScope), sentinelBefore);
@@ -349,7 +353,7 @@ test('Atlas HTTP regression', { timeout: 240000 }, async function (t) {
                     release.resolve();
                     await Promise.allSettled(requests);
                 }
-                assert.equal(userResult.status, 200);
+                assert.equal(userResult.status, operation === 'rename' ? 200 : 204);
                 if (operation === 'rename') {
                     assert.equal(taskResult.status, 201);
                     const stored = await Task.findById(taskResult.data._id);

@@ -71,19 +71,24 @@ test('Atlas User write and cross-resource integration', { timeout: 240000 }, asy
         assert.equal(Object.hasOwn(value, '__v'), false);
         for (const child of Object.values(value)) publicData(child);
     }
-    async function request(method, path, body, status = method === 'POST' ? 201 : 200, message) {
+    async function request(method, path, body, status = method === 'POST' ? 201 : method === 'DELETE' ? 204 : 200, message) {
         const response = await fetch(base + '/api/' + path, {
             method,
             ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         });
+        assert.equal(response.status, status, method + ' ' + path);
+        if (status === 204) {
+            assert.equal(await response.text(), '');
+            await consistent();
+            return null;
+        }
         const result = await response.json();
-        assert.equal(response.status, status, method + ' ' + path + ': ' + JSON.stringify(result));
         assert.match(response.headers.get('content-type'), /application\/json/);
         assert.deepEqual(Object.keys(result).sort(), ['data', 'message']);
         assert.equal(typeof result.message, 'string');
         publicData(result.data);
         if (message !== undefined) assert.equal(result.message, message);
-        if (status >= 400 || method === 'DELETE') {
+        if (status >= 400) {
             assert.equal(result.data, null);
         } else if (method === 'POST' || method === 'PUT') {
             const resource = path.startsWith('users') ? 'User' : 'Task';
@@ -94,9 +99,6 @@ test('Atlas User write and cross-resource integration', { timeout: 240000 }, asy
             assert.equal(result.message, 'OK');
         }
         if (status === 500) assert.equal(result.message, 'Internal server error.');
-        if (method === 'DELETE' && status === 200) {
-            assert.equal(result.message, (path.startsWith('users') ? 'User' : 'Task') + ' deleted.');
-        }
         await consistent();
         return result.data;
     }

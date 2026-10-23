@@ -62,24 +62,28 @@ test('Atlas Task write integration', { timeout: 180000 }, async function (t) {
         }
     }
 
-    async function request(method, id, body, status = method === 'POST' ? 201 : 200) {
+    async function request(method, id, body, status = method === 'POST' ? 201 : method === 'DELETE' ? 204 : 200) {
         const response = await fetch(base + '/api/tasks' + (id === undefined ? '' : '/' + id), {
             method,
             ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         });
+        assert.equal(response.status, status, method + ' ' + id);
+        if (status === 204) {
+            assert.equal(await response.text(), '');
+            await consistent();
+            return null;
+        }
         const result = await response.json();
-        assert.equal(response.status, status, method + ' ' + id + ': ' + JSON.stringify(result));
         assert.match(response.headers.get('content-type'), /application\/json/);
         assert.deepEqual(Object.keys(result).sort(), ['data', 'message']);
         assert.equal(typeof result.message, 'string');
-        if (status >= 400 || method === 'DELETE') {
+        if (status >= 400) {
             assert.equal(result.data, null);
         } else {
             assert.equal(Object.hasOwn(result.data, '__v'), false);
             assert.deepEqual(result.data, JSON.parse(JSON.stringify(await Task.findById(result.data._id))));
         }
         if (status === 500) assert.equal(result.message, 'Internal server error.');
-        if (method === 'DELETE' && status === 200) assert.equal(result.message, 'Task deleted.');
         await consistent();
         return result.data;
     }
