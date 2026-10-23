@@ -74,6 +74,23 @@ test('API foundation HTTP responses', async function (t) {
     });
 });
 
+test('malformed URL encoding returns JSON 404 for detail routes', async function (t) {
+    const base = await serve(t, createApp());
+    for (const resource of ['users', 'tasks']) {
+        for (const id of ['%ZZ', '%E0%A4%A']) {
+            for (const method of ['GET', 'PUT', 'DELETE']) {
+                const path = '/api/' + resource + '/' + id;
+                await t.test(method + ' ' + path, async function () {
+                    const response = await fetch(base + path, { method });
+                    assert.equal(response.status, 404);
+                    assert.match(response.headers.get('content-type'), /application\/json/);
+                    assert.deepEqual(await response.json(), { message: 'Resource not found.', data: null });
+                });
+            }
+        }
+    }
+});
+
 test('error middleware handles synchronous and asynchronous failures safely', async function (t) {
     const app = express();
     app.use(express.json());
@@ -84,7 +101,16 @@ test('error middleware handles synchronous and asynchronous failures safely', as
         ['duplicate', new mongoose.mongo.MongoServerError({
             code: 11000, errmsg: 'private-marker', keyPattern: { email: 1 }
         }), 400, 'Email is already in use.'],
-        ['unexpected', new Error('private-marker mongodb://sensitive'), 500, 'Internal server error.']
+        ['unexpected', new Error('private-marker mongodb://sensitive'), 500, 'Internal server error.'],
+        ['uri', new URIError('private-marker'), 500, 'Internal server error.'],
+        ['uri-status', Object.assign(new URIError('private-marker'), { status: 400 }),
+            500, 'Internal server error.'],
+        ['uri-prefix', new URIError("Failed to decode param 'private-marker'"),
+            500, 'Internal server error.'],
+        ['unexpected-status', Object.assign(new Error('private-marker'), { status: 400 }),
+            500, 'Internal server error.'],
+        ['unexpected-decode', Object.assign(new Error("Failed to decode param 'private-marker'"), { status: 400 }),
+            500, 'Internal server error.']
     ];
     for (const [path, error] of failures) {
         app.get('/' + path, async function () { throw error; });

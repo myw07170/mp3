@@ -9,7 +9,7 @@
     "Sujay Khandekar <khandek2@illinois.edu>"
   ],
   "engines": {
-    "node": ">=24"
+    "node": "24.x"
   },
   "scripts": {
     "start": "node server.js",
