@@ -20,15 +20,14 @@ test('API foundation HTTP responses', async function (t) {
         assert.deepEqual(await response.json(), { message: 'OK', data: { status: 'API is running.' } });
     });
 
-    await t.test('unknown paths and unimplemented writes return JSON 404', async function () {
+    await t.test('unknown paths and collection writes without a resource ID return JSON 404', async function () {
         for (const path of ['/unknown', '/api/unknown', '/api/users/extra/path', '/api/tasks/extra/path']) {
             const response = await fetch(base + path);
             assert.equal(response.status, 404);
             assert.deepEqual(await response.json(), { message: 'Resource not found.', data: null });
         }
         for (const path of ['/api/users', '/api/tasks']) {
-            for (const method of ['POST', 'PUT', 'DELETE']) {
-                if (path === '/api/tasks' && method === 'POST') continue;
+            for (const method of ['PUT', 'DELETE']) {
                 const response = await fetch(base + path, { method });
                 assert.equal(response.status, 404);
                 assert.deepEqual(await response.json(), { message: 'Resource not found.', data: null });
@@ -52,16 +51,18 @@ test('API foundation HTTP responses', async function (t) {
         assert.deepEqual(await response.json(), { message: 'Request body must contain valid JSON.', data: null });
     });
 
-    await t.test('Task POST rejects missing input and malformed detail writes return 404', async function () {
-        const response = await fetch(base + '/api/tasks', { method: 'POST' });
-        assert.equal(response.status, 400);
-        assert.deepEqual(await response.json(), { message: 'Request body must be an object.', data: null });
-        for (const method of ['PUT', 'DELETE']) {
-            const missing = await fetch(base + '/api/tasks/missing', {
-                method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 12 })
-            });
-            assert.equal(missing.status, 404);
-            assert.deepEqual(await missing.json(), { message: 'Task not found.', data: null });
+    await t.test('POST rejects missing input and malformed detail writes return 404', async function () {
+        for (const [path, resource] of [['users', 'User'], ['tasks', 'Task']]) {
+            const response = await fetch(base + '/api/' + path, { method: 'POST' });
+            assert.equal(response.status, 400);
+            assert.deepEqual(await response.json(), { message: 'Request body must be an object.', data: null });
+            for (const method of ['PUT', 'DELETE']) {
+                const missing = await fetch(base + '/api/' + path + '/missing', {
+                    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 12 })
+                });
+                assert.equal(missing.status, 404);
+                assert.deepEqual(await missing.json(), { message: resource + ' not found.', data: null });
+            }
         }
     });
 
