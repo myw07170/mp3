@@ -1,6 +1,7 @@
 const express = require('express');
 const mountRoutes = require('./routes');
 const { notFound, errorHandler } = require('./middleware/errors');
+const { mountPutChecks } = require('./middleware/resources');
 
 function createApp() {
     const app = express();
@@ -14,6 +15,7 @@ function createApp() {
         }
         next();
     });
+    mountPutChecks(app);
     app.use(express.urlencoded({ extended: true }));
     app.use(express.json());
     mountRoutes(app);

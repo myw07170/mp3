@@ -82,6 +82,32 @@ test('Atlas GET integration', { timeout: 120000 }, async function (t) {
     for (const { path, documents, Model } of resources) {
         const scope = { _id: { $in: ids(documents) } };
 
+        await t.test(path + ': all 32 optional-parameter combinations on scoped fixtures', async function () {
+            const matches = documents.slice(2);
+            const values = { sort: { name: -1 }, select: { name: 1, _id: 0 }, skip: 2, limit: 3, count: true };
+            const names = Object.keys(values);
+            for (let mask = 0; mask < 32; mask++) {
+                const query = { where: { ...scope, name: { $gte: documents[2].name } } };
+                names.forEach((name, bit) => { if (mask & (1 << bit)) query[name] = values[name]; });
+                const result = await request(path, query);
+                if (query.count) {
+                    assert.equal(result, matches.length);
+                    continue;
+                }
+                const start = query.skip || 0;
+                const maximum = query.limit || (path === 'tasks' ? 100 : matches.length);
+                assert.equal(result.length, Math.min(maximum, matches.length - start));
+                assert.equal(new Set(result.map(row => row.name)).size, result.length);
+                assert.ok(result.every(row => matches.some(document => document.name === row.name)));
+                if (query.select) for (const row of result) assert.deepEqual(Object.keys(row), ['name']);
+                if (query.sort) {
+                    const page = [...matches].reverse().slice(start, start + maximum);
+                    assert.deepEqual(result, query.select ? page.map(document => ({ name: document.name })) : expected(page));
+                }
+            }
+            t.diagnostic(path + ': verified 32 scoped query combinations, including count before pagination.');
+        });
+
         await t.test(path + ': default limits, explicit limits, and pagination', async function () {
             const defaultData = await request(path, { where: scope, sort: { name: 1 } });
             assert.deepEqual(defaultData, expected(path === 'tasks' ? documents.slice(0, 100) : documents));
@@ -91,6 +117,14 @@ test('Atlas GET integration', { timeout: 120000 }, async function (t) {
             assert.deepEqual(await request(path, { where: scope, sort: { name: 1 }, skip: 104, limit: 5 }), expected(documents.slice(104)));
             assert.deepEqual(await request(path, { where: scope, skip: 105 }), []);
             assert.deepEqual(await request(path, { where: scope, skip: 200 }), []);
+            for (const limit of [99, 100, 101]) {
+                assert.deepEqual(await request(path, { where: scope, sort: { name: 1 }, limit }), expected(documents.slice(0, limit)));
+            }
+            for (const skip of [99, 100, 101, 106]) {
+                assert.deepEqual(await request(path, { where: scope, sort: { name: 1 }, skip, limit: 1 }), expected(documents.slice(skip, skip + 1)));
+            }
+            assert.deepEqual(await request(path, { where: scope, skip: Number.MAX_SAFE_INTEGER, limit: Number.MAX_SAFE_INTEGER }), []);
+            assert.deepEqual(await request(path, { where: scope, sort: { name: 1 }, limit: Number.MAX_SAFE_INTEGER }), expected(documents));
         });
 
         await t.test(path + ': filters and ascending/descending sorts', async function () {

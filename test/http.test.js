@@ -120,6 +120,14 @@ test('collection routes reject invalid query parameters before database access',
         ['skip', '-1'], ['limit', '1.5'], ['count', '"true"']
     ];
     for (const resource of ['users', 'tasks']) {
+        for (const name of ['skip', 'limit']) {
+            for (const value of ['-1', '1.5', 'true', 'null', '[]', '"2"', '9007199254740992', '1e309']) {
+                const params = new URLSearchParams({ [name]: value, count: 'true' });
+                const response = await fetch(base + '/api/' + resource + '?' + params);
+                assert.equal(response.status, 400);
+                assert.deepEqual(await response.json(), { message: 'Invalid query parameter: ' + name + '.', data: null });
+            }
+        }
         for (const [name, value] of invalid) {
             const params = new URLSearchParams({ [name]: value });
             const response = await fetch(base + '/api/' + resource + '?' + params);

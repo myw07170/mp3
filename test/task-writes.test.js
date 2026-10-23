@@ -216,6 +216,7 @@ test('Atlas Task write integration', { timeout: 180000 }, async function (t) {
         t.mock.method(User, 'updateOne', async function (filter, update, options) {
             assert.ok(options.session.inTransaction());
             const result = await original.call(this, filter, update, options);
+            if (update.$inc) return result;
             assert.equal(result.modifiedCount, 1);
             insertedId = update.$addToSet.pendingTasks;
             assert.ok(await Task.findById(insertedId).session(options.session));
@@ -239,6 +240,7 @@ test('Atlas Task write integration', { timeout: 180000 }, async function (t) {
         t.mock.method(User, 'updateOne', async function (filter, update, options) {
             assert.ok(options.session.inTransaction());
             const result = await original.call(this, filter, update, options);
+            if (update.$inc) return result;
             assert.equal(result.modifiedCount, 1);
             operations.push(update.$pull ? 'remove' : 'add');
             if (update.$addToSet) {
