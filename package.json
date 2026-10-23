@@ -16,7 +16,7 @@
     "dev": "nodemon server.js",
     "submit": "node submit.js",
     "test": "node --test test/foundation.test.js test/http.test.js test/query.test.js",
-    "test:db": "node --test --test-concurrency=1 test/database.test.js test/reads.test.js"
+    "test:db": "node --test --test-concurrency=1 test/database.test.js test/reads.test.js test/task-writes.test.js"
   },
   "repository": {
     "type": "git",

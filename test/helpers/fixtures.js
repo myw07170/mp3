@@ -44,7 +44,13 @@ function createFixtures() {
         }
     }
 
-    return { user, task, cleanup };
+    function trackTask(id) {
+        if (!taskIds.some(existing => existing.toString() === id.toString())) {
+            taskIds.push(new mongoose.Types.ObjectId(id));
+        }
+    }
+
+    return { user, task, trackTask, cleanup };
 }
 
 module.exports = { createFixtures };

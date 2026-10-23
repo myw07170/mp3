@@ -28,6 +28,7 @@ test('API foundation HTTP responses', async function (t) {
         }
         for (const path of ['/api/users', '/api/tasks']) {
             for (const method of ['POST', 'PUT', 'DELETE']) {
+                if (path === '/api/tasks' && method === 'POST') continue;
                 const response = await fetch(base + path, { method });
                 assert.equal(response.status, 404);
                 assert.deepEqual(await response.json(), { message: 'Resource not found.', data: null });
@@ -49,6 +50,19 @@ test('API foundation HTTP responses', async function (t) {
         });
         assert.equal(response.status, 400);
         assert.deepEqual(await response.json(), { message: 'Request body must contain valid JSON.', data: null });
+    });
+
+    await t.test('Task POST rejects missing input and malformed detail writes return 404', async function () {
+        const response = await fetch(base + '/api/tasks', { method: 'POST' });
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { message: 'Request body must be an object.', data: null });
+        for (const method of ['PUT', 'DELETE']) {
+            const missing = await fetch(base + '/api/tasks/missing', {
+                method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 12 })
+            });
+            assert.equal(missing.status, 404);
+            assert.deepEqual(await missing.json(), { message: 'Task not found.', data: null });
+        }
     });
 
     await t.test('CORS preflight returns a bodyless 204', async function () {
