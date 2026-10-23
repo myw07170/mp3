@@ -1,49 +1,30 @@
-// Get the packages we need
-var express = require('express'),
-    router = express.Router(),
-    mongoose = require('mongoose');
+const mongoose = require('mongoose');
+const createApp = require('./app');
+const { connectDatabase } = require('./config/database');
 
-// Read .env file
-require('dotenv').config();
-
-// Create our Express application
-var app = express();
-
-// Use environment defined port or 3000
-var port = process.env.PORT || 3000;
-
-// Connect to a MongoDB --> Uncomment this once you have a connection string!!
-require('node:dns/promises').setServers(['8.8.8.8']);
-// mongoose.connect(process.env.MONGODB_URI).catch(function (err) { console.error('MongoDB connection error:', err.message); });
-
-console.log('Connecting to MongoDB...');
-
-mongoose.connect(process.env.MONGODB_URI, {
-    serverSelectionTimeoutMS: 10000
-})
-.then(function () {
+async function start() {
+    console.log('Connecting to MongoDB...');
+    await connectDatabase();
     console.log('MongoDB connected');
-})
-.catch(function (err) {
-    console.error('MongoDB connection error:', err.message);
-});
 
-// Allow CORS so that backend and frontend could be put on different servers
-var allowCrossDomain = function (req, res, next) {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept");
-    res.header("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS");
-    next();
-};
-app.use(allowCrossDomain);
+    const app = createApp();
+    const port = process.env.PORT || 3000;
+    const server = await new Promise(function (resolve, reject) {
+        const listener = app.listen(port, function () {
+            resolve(listener);
+        });
+        listener.once('error', reject);
+    });
+    console.log('Server running on port ' + server.address().port);
+    return server;
+}
 
-// Parse URL-encoded and JSON request bodies
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+if (require.main === module) {
+    start().catch(async function () {
+        console.error('Server startup failed. Check the database connection, indexes, and port configuration.');
+        await mongoose.disconnect().catch(function () {});
+        process.exitCode = 1;
+    });
+}
 
-// Use routes as a module (see index.js)
-require('./routes')(app, router);
-
-// Start the server
-app.listen(port);
-console.log('Server running on port ' + port);
+module.exports = { start };

@@ -7,6 +7,8 @@ node_modules
 node_modules/*
 public/
 public/*
+docs
+AGENTS.md
 
 # Environment variables (copy .env.example to .env). Never commit .env
 .env

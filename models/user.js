@@ -1,10 +1,24 @@
-// Load required packages
-var mongoose = require('mongoose');
+const mongoose = require('mongoose');
+const schemaOptions = require('./options');
+const { isResourceId } = require('../lib/validation');
 
-// Define our user schema
-var UserSchema = new mongoose.Schema({
-    name: String
-});
+const userSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        validate: value => value.trim().length > 0
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        validate: value => value.trim().length > 0
+    },
+    pendingTasks: {
+        type: [String],
+        default: () => [],
+        validate: value => Array.isArray(value) && value.every(isResourceId)
+    }
+}, schemaOptions());
 
-// Export the Mongoose model
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('User', userSchema);
